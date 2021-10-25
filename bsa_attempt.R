@@ -623,7 +623,7 @@ p1 <- BSA %>%
 p1
 assign("index", 0, environment(grid:::grobAutoName)) #resets the grob integers
 gTable <- ggplot_gtable(ggplot_build(p1))
-gTable$grobs[[4]]$children[2]$axis$grobs[[2]]$children$GRID.text.76$label <- ""
+gTable$grobs[[4]]$children[2]$axis$grobs[[2]]$children$GRID.text.74$label <- ""
 gTable$grobs[[4]]$children[2]$axis$grobs[[1]]$y <- unit(0, units = "npc")
 gTable$grobs[[4]]$children[2]$axis$grobs[[1]]$x <- rep(unit(0, units = "npc"), 8) 
 # grid::grid.newpage()
@@ -652,4 +652,5 @@ cowplot::plot_grid(dr_plots, gTable, ncol = 1,
 #     theme(axis.text.x = element_blank()) +
 #     ggforce::facet_zoom(xlim = c(8674896, 10105717))
 # 
+
 
