@@ -352,11 +352,6 @@ dr_dot <- pheno_df %>% filter(grepl("NASE", cross) |
            alpha = "none"
            )
 
-dr_plots <- cowplot::plot_grid(dr_hist + facet_grid(~ "All\nLines") + theme(legend.position = "none"), 
-                   dr_dot, 
-                   rel_widths = c(0.25, 0.75),
-                   labels = c("a", "b"))
-
 F1s %>% filter(line %in% samples) %>% 
     select(line, CMD, CMDs_Yr1, CMDs_Yr2, meanRating) %>%
     distinct() %>%  
@@ -629,28 +624,244 @@ gTable$grobs[[4]]$children[2]$axis$grobs[[1]]$x <- rep(unit(0, units = "npc"), 8
 # grid::grid.newpage()
 # grid::grid.draw(gTable)
 
-cowplot::plot_grid(dr_plots, gTable, ncol = 1,
+rough <- cowplot::plot_grid(dr_plots, gTable, ncol = 1,
                    rel_heights = c(0.3, 0.7),
                    labels = c("", "c"))
 
-# BSA %>% filter(CHROM == "chromosomeXII") %>% 
-#     ggplot() +
-#     geom_line(aes(x = POS, y = smoothDeltaSNP)) +
-#     geom_line(aes(x = POS, y = CI_99), color = "red") +
-#     geom_line(aes(x = POS, y = -CI_99), color = "red") +
-#     
-#     geom_vline(xintercept = 8674896) +
-#     
-#     geom_vline(xintercept = 10105717) +
-#     
-#     #facet_grid(~ paste0("Chr", str_pad(as.numeric(as.roman(str_remove(CHROM, "chromosome"))), 
-#                                #        width = 2, pad = "0")), scales = "free") +
-#     scale_x_continuous(name = "Genomic position") + 
-#     scale_y_continuous(name = "deltaSNP", limits = c(-0.34, 0.34)) +
-#     cowplot::theme_cowplot() +
-#     cowplot::panel_border() +
-#     theme(axis.text.x = element_blank()) +
-#     ggforce::facet_zoom(xlim = c(8674896, 10105717))
+
+#### Fine Mapping #####
+
+geno <- read.csv(file = "KASP_genotypes.csv")
+
+dataM1_M8 <- read_tsv(file = "plates_layout_1_11.txt") %>% 
+    gather("col", "line", -plate, -row, convert = TRUE) %>% 
+    mutate(threeEightyFour_row = case_when(row == "A" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "A",
+                                           row == "B" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "C",
+                                           row == "C" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "E",
+                                           row == "D" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "G",
+                                           row == "E" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "I",
+                                           row == "F" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "K",
+                                           row == "G" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "M",
+                                           row == "H" & plate %in% c(1, 2, 5, 6, 9, 10) ~ "O",
+                                           
+                                           row == "A" & plate %in% c(3, 4, 7, 8, 11) ~ "B",
+                                           row == "B" & plate %in% c(3, 4, 7, 8, 11) ~ "D",
+                                           row == "C" & plate %in% c(3, 4, 7, 8, 11) ~ "F",
+                                           row == "D" & plate %in% c(3, 4, 7, 8, 11) ~ "H",
+                                           row == "E" & plate %in% c(3, 4, 7, 8, 11) ~ "J",
+                                           row == "F" & plate %in% c(3, 4, 7, 8, 11) ~ "L",
+                                           row == "G" & plate %in% c(3, 4, 7, 8, 11) ~ "N",
+                                           row == "H" & plate %in% c(3, 4, 7, 8, 11) ~ "P",
+    ),
+    threeEightyFour_col = case_when(
+        plate %in% c(1, 3, 5, 7, 9, 11) ~ (col * 2) - 1,
+        plate %in% c(2, 4, 6, 8, 10) ~ col * 2
+    ),
+    well = paste0(threeEightyFour_row, str_pad(threeEightyFour_col, width = 2, pad = "0"))
+    ) %>% 
+    mutate(set = case_when(plate %in% seq(1, 4) ~ 1,
+                           plate %in% seq(5, 8) ~ 2,
+                           plate %in% seq(9, 11) ~ 3)) %>% 
+    left_join(geno, by = c("well" = "Well", "set" = "set")) %>% 
+    left_join(pheno %>% select(id, `CMD (R/S)`), by = c("line" = "id")) %>% 
+    rename(CMD = `CMD (R/S)`) %>% 
+    mutate(type = ifelse(line == "H2O", "NTC", "Unk"),
+           CMD = ifelse(type == "NTC", "NTC", CMD)) %>% 
+    # pivot_longer(cols = c(M1, M8), names_to = c("marker"), values_to = c("Call")) %>% 
+    mutate(
+        POS = as_factor(case_when(
+            marker == "M1" ~ 28813130,
+            marker == "M2" ~ 28566364,
+            marker == "M6" ~ 27949218,
+            marker == "M8" ~ 27382308
+        )),
+        Call = case_when(marker %in% c("M8")  & Call == "Allele 1" ~ "Allele 2",
+                         marker %in% c("M8") & Call == "Allele 2" ~ "Allele 1",
+                         TRUE ~ Call),
+        line = fct_reorder(line, as.numeric(as.factor(CMD))),
+        Call = fct_relevel(Call, "Allele 1", "Heterozygote", "Allele 2"))
+
+# recombinants <- dataM1_M8 %>% # filter(marker %in% c("M6", "M8")) %>% 
+#     group_by(line) %>% 
+#     mutate(allSame = length(unique(Call)) == 1) %>% 
+#     filter(!allSame) %>%
+#     filter(!any(Call %in% c("No Call", "Undetermined")))
 # 
+# informatives <- recombinants %>% 
+#     group_by(line) %>% 
+#     mutate(phenoMatchGeno = case_when(
+#         CMD == "R" & any(Call == "Allele 1") ~ FALSE,
+#         CMD == "S" & any(Call == "Allele 2") ~ FALSE,
+#         TRUE ~ TRUE
+#     )) %>% 
+#     filter(!phenoMatchGeno)
 
 
+super <- dataM1_M8 %>% filter(
+    line %in% c(
+        "P1862",
+        "P1832",
+        "P000264",
+        "P000901",
+        "P1942",
+        "P1606",
+        "P1504",
+        "P000207",
+        "P001430",
+        "P001443"
+    )
+) 
+
+controls <- dataM1_M8 %>% 
+    filter(line %in% c("P1561","P1581")) %>% 
+    add_row(line = rep(c("P1561","P1581"), each = 3), 
+            marker = rep(c("M3", "M5", "M7"), 2),
+            Call = rep(c("Allele 2", "Allele 1"), each = 3),
+            CMD = rep(c("R", "S"), each = 3)
+            )
+
+super_M3_5_7 <- read_tsv("recombinantsM3_5_7_12162020.txt") %>% 
+    rename(well = Well,
+           Call_org = Call) %>% 
+    mutate(row = str_extract(well, pattern = "[A-Z]"),
+           col = as.integer(str_extract(well, pattern = "[0-9].*")),
+           marker = case_when(row %in% c("A", "B") ~ "M3",
+                              row %in% c("C", "D") ~ "M5",
+                              row %in% c("E", "F") ~ "M7"),
+           POS = as.factor(case_when(row %in% c("A", "B") ~ 28522172,
+                                     row %in% c("C", "D") ~ 28083312,
+                                     row %in% c("E", "F") ~ 28332112)),
+           rep = ifelse(row %in% c("A", "C", "E"), 1, 2),
+           line = rep(c(
+               "P1504",
+               "P1606",
+               "P1832",
+               "P1862",
+               "P001430",
+               "P1942",
+               "P001443",
+               "P000207",
+               "P000264",
+               "P000901",
+               "NTC"
+           ), 6)
+    ) %>% 
+    left_join(super %>% select(line, CMD), by = "line") %>%  # copy over CMD values
+    mutate(Call_org = case_when(marker %in% c("M7")  & Call_org == "Allele 1" ~ "Allele 2",
+                            marker %in% c("M7") & Call_org == "Allele 2" ~ "Allele 1",
+                            TRUE ~ Call_org)
+           ) %>% 
+    group_by(line, marker) %>% 
+    filter(Call_org != "No Call") %>% 
+    mutate(Call = unique(Call_org))
+
+super_allM <- bind_rows(super, controls, super_M3_5_7  %>% distinct(line, marker, Call, .keep_all = TRUE)) %>% 
+    ungroup() %>% 
+    mutate(Call = fct_relevel(Call, "Allele 1", "Heterozygote", "Allele 2")) %>% 
+    mutate(line = fct_relevel(line, "P1561", "P1504", "P001430", "P000207", "P1862", "P000264", "P1832", "P000901", "P1606", "P1942", "P1581")) %>%
+    mutate(POS = case_when(
+        marker == "M1" ~ 8674846 + 50, 
+        marker == "M2" ~ 8921611 + 50, 
+        marker == "M3" ~ 8965803 + 50, 
+        marker == "M4" ~ 9311735 + 50, 
+        marker == "M5" ~ 9404663 + 50, 
+        marker == "M6" ~ 9538757 + 50, 
+        marker == "M7" ~ 9155863 + 50, 
+        marker == "M8" ~ 10105667 + 50 
+    )) %>% 
+    mutate(pos_label = paste(prettyNum(POS, big.mark = ","), marker, sep = "\n")) %>% 
+    mutate(pos_label = fct_reorder(pos_label, .x = as.numeric(POS))) 
+
+n1 <- length(unique(super_allM$marker))
+n2 <- length(unique(super_allM$line))
+
+finemap <- super_allM %>% 
+    filter(!is.na(CMD)) %>% 
+    filter(!line %in% c("P1504", "P001443")) %>%
+    # mutate(line = fct_reorder(line, .fun = mean, as.numeric(as.factor(CMD)))) %>% 
+    # mutate(line = fct_relevel(line, as.character(rec_order))) %>%
+    ggplot(aes(x = pos_label, y = line)) +
+    geom_tile(aes(fill = Call, color = Call), height = 0.8) +
+    geom_tile(aes(x = 0.35, fill2 = as.factor(CMD)), width = 0.25) %>%
+    rename_geom_aes(new_aes = c("fill" = "fill2")) +
+    # scale_colour_brewer(type = "div",
+    #                     palette = "Set2",
+    #                     aesthetics = "fill",
+    #                     guide = "legend",
+    #                     name = "Genotype call") +
+    # scale_colour_brewer(type = "div",
+    #                     palette = "Set2",
+    #                     aesthetics = "color",
+    #                     guide = "legend",
+    #                     name = "Genotype call") +
+    # scale_colour_manual(aesthetics = "fill", values = RColorBrewer::brewer.pal(3,"Set1")[c(2, 3, 1)]) +
+    # scale_colour_manual(aesthetics = "color", values = RColorBrewer::brewer.pal(3,"Set1")[c(2, 3, 1)]) +
+    scale_colour_manual(aesthetics = c("fill", "color"), values = c("#5F98C6", "#CBCBCB", "#E94849")) +
+    scale_colour_brewer(type = "div",
+                        palette = "Set1",
+                        aesthetics = "fill2",
+                        guide = "legend",
+                        name = "Resistance") +
+    geom_vline(xintercept = 0.480, size = 1) +
+    # geom_line(data = data.frame(x = c(0, n1) + 0.5, y = rep(2:n2, each = 2) - 0.5),
+    #           aes(x = x, y = y, group = y)) +
+    # geom_point(aes(x = 0.5, y = line, color = `CMD`), size = 4) +
+    #annotate(geom = "text", x = 5, y = 0.75, label = "*", size = 20) +
+    labs(x = "Marker physical position (bp)", y = "Line") +
+    cowplot::theme_cowplot() +
+    cowplot::panel_border() 
+
+m1_dist <- dataM1_M8 %>% filter(CMD != "NA", marker == "M1", !Call %in% c("No Call", "Undetermined")) %>%
+    filter(!CMD %in% c("NTC")) %>% 
+    filter(!is.na(marker)) %>%
+    ggplot() +
+    geom_bar(aes(x = CMD, fill = Call)) +
+    facet_grid(~ marker, scales =
+                   "free") + 
+    #scale_colour_brewer(
+    #                    type = "div",
+    #                    palette = "Set2",
+    #                    aesthetics = "fill",
+    #                    guide = "legend",
+    #                    name = "Genotype call"
+    #                ) +
+    scale_colour_manual(aesthetics = c("fill", "color"), values = c("#5F98C6", "#CBCBCB", "#E94849")) +
+    guides(fill = "none") +
+    cowplot::theme_cowplot() +
+    cowplot::panel_border() 
+
+
+#Build it
+
+# dr_plots <- cowplot::plot_grid(dr_hist + facet_grid(~ "All\nLines") + theme(legend.position = "none"), 
+#                                dr_dot, 
+#                                rel_widths = c(0.25, 0.75),
+#                                labels = c("a", "b"),
+#                                align = "h")
+
+plots_l <- cowplot::align_plots(dr_hist + facet_grid(~ "All\nLines") + theme(legend.position = "none"),
+                              gTable,
+                              finemap,
+                              align = 'v', axis = 'l')
+
+plots_r <- cowplot::align_plots(dr_dot,
+                                gTable,
+                                finemap,
+                                align = 'v', axis = 'lr')
+
+
+dr_plots <- cowplot::plot_grid(plots_l[[1]], plots_r[[1]], 
+                               rel_widths = c(0.25, 0.75),
+                               labels = c("a", "b"),
+                               align = "h")
+
+
+mid_plots <- cowplot::plot_grid(plots_l[[2]], m1_dist, rel_widths = c(0.85, 0.15),
+                                align = "h", axis = "b",
+                                labels = c("c", "d"))
+
+
+cowplot::plot_grid(dr_plots, mid_plots, plots_r[[3]],
+                   labels = c("", "", "e"),
+                   ncol = 1,
+                   rel_heights = c(1,1.75,1))
