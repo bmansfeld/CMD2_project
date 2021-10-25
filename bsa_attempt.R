@@ -135,7 +135,7 @@ dr_hist <- pheno_df %>%
                         guide = "legend",
                         name = "Resistance",
                         na.value="grey") +
-    labs(x = "Average disease rating (2 years)", y = "Number of lines") +
+    labs(x = "Average disease rating\n(2 years)", y = "Number of lines") +
     cowplot::theme_cowplot() +
     cowplot::panel_border()
 
@@ -168,6 +168,8 @@ pheno_df %>% filter(grepl("NASE", cross) |
          y = "Disease score (year 2)") +
     cowplot::panel_border()
 
+#chi-sq 
+#todo
 pheno_df %>% 
     group_by(mainCross) %>% 
     summarise(pval = chisq.test(as.numeric(CMD))$p.value)
@@ -208,32 +210,32 @@ tidy_geno_het_pheno <- tidy_geno_het %>%
     ))
 
 
-tidy_geno_het_pheno %>% filter(!is.na(CMD)) %>%
-    filter(CHROM == "chromosomeXII") %>% #filter(between(POS, 30e6, 35e6)) %>% 
-    # filter(between(POS, 25e6, 35e6)) %>%
-    #mutate(line = fct_relevel(line, levels_line)) %>%
-    mutate(line = fct_reorder(line, .x = as.numeric(meanRating), .fun = sum, na.rm = TRUE)) %>%
-    ggplot(aes(y = line, height = height)) +
-    geom_tile(aes(x = as.factor(POS), fill = as.factor(Call), color = as.factor(Call))) +
-    geom_tile(aes(x = -1, fill2 = as.factor(meanRating)), width = 3) %>%
-    rename_geom_aes(new_aes = c("fill" = "fill2")) +
-    scale_colour_brewer(type = "div",
-                        palette = "RdYlBu",
-                        aesthetics = "fill",
-                        guide = "legend",
-                        name = "Genotype call") +
-    scale_colour_brewer(type = "div",
-                        palette = "RdYlBu",
-                        aesthetics = "color",
-                        guide = "legend",
-                        name = "Genotype call") +
-    scale_colour_brewer(type = "div",
-                        aesthetics = "fill2",
-                        guide = "legend",
-                        name = "Resistance") +
-    scale_x_discrete(breaks = breaker(0.25)) +
-    scale_y_discrete(breaks = c("5001-26", "NASE14")) +
-    facet_grid(type ~ CHROM, scales = "free", space = "free")
+# tidy_geno_het_pheno %>% filter(!is.na(CMD)) %>%
+#     filter(CHROM == "chromosomeXII") %>% #filter(between(POS, 30e6, 35e6)) %>% 
+#     # filter(between(POS, 25e6, 35e6)) %>%
+#     #mutate(line = fct_relevel(line, levels_line)) %>%
+#     mutate(line = fct_reorder(line, .x = as.numeric(meanRating), .fun = sum, na.rm = TRUE)) %>%
+#     ggplot(aes(y = line, height = height)) +
+#     geom_tile(aes(x = as.factor(POS), fill = as.factor(Call), color = as.factor(Call))) +
+#     geom_tile(aes(x = -1, fill2 = as.factor(meanRating)), width = 3) %>%
+#     rename_geom_aes(new_aes = c("fill" = "fill2")) +
+#     scale_colour_brewer(type = "div",
+#                         palette = "RdYlBu",
+#                         aesthetics = "fill",
+#                         guide = "legend",
+#                         name = "Genotype call") +
+#     scale_colour_brewer(type = "div",
+#                         palette = "RdYlBu",
+#                         aesthetics = "color",
+#                         guide = "legend",
+#                         name = "Genotype call") +
+#     scale_colour_brewer(type = "div",
+#                         aesthetics = "fill2",
+#                         guide = "legend",
+#                         name = "Resistance") +
+#     scale_x_discrete(breaks = breaker(0.25)) +
+#     scale_y_discrete(breaks = c("5001-26", "NASE14")) +
+#     facet_grid(type ~ CHROM, scales = "free", space = "free")
 
 
 getG <- function(LowRef, HighRef, LowAlt, HighAlt)
@@ -461,6 +463,15 @@ BSA <- F1s %>%
     mutate(minDP = floor(min(c(smoothDP_R, smoothDP_S)))) %>% 
     left_join(CIs, by = c("minDP" = "depth"))
 
+
+BSA %>% 
+    ggplot() +
+    geom_histogram(aes(x = SNPindex_R))
+
+BSA %>% 
+    ggplot() +
+    geom_histogram(aes(x = SNPindex_S)) 
+
 # BSA2 <- F1s %>% 
 #     group_by(CHROM) %>% 
 #     filter(n() / 273 >= 100) %>% 
@@ -566,7 +577,7 @@ p1 <- BSA %>%
     ggplot() +
     # geom_line(aes(x = POS + xcumsumpad, y = CI_99), color = "#EB8F86", size = 1) +
     # geom_line(aes(x = POS + xcumsumpad, y = -CI_99), color = "#EB8F86", size = 1) +
-    geom_point(aes(x = POS + xcumsumpad, y = deltaSNP), alpha = 0.01) +
+    geom_point(data = . %>% mutate(zoom = FALSE), aes(x = POS + xcumsumpad, y = deltaSNP), alpha = 0.01) +
     geom_line(aes(x = POS + xcumsumpad, y = CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = -CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = smoothDeltaSNP)) +
@@ -642,15 +653,3 @@ cowplot::plot_grid(dr_plots, gTable, ncol = 1,
 #     ggforce::facet_zoom(xlim = c(8674896, 10105717))
 # 
 
-
-BSA %>% 
-    left_join(chrm_lengths, by = "CHROM") %>% 
-    filter(smoothDeltaSNP > abs(CI_99)) %>% view()
-
-BSA %>% 
-    ggplot() +
-    geom_histogram(aes(x = SNPindex_R))
-
-BSA %>% 
-    ggplot() +
-    geom_histogram(aes(x = SNPindex_S)) 
