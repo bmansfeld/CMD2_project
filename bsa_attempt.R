@@ -120,9 +120,9 @@ pheno_df <- all_pheno %>%
     mutate(
         line = sub("VRUG", "UGVR", line),
         mainCross = case_when(
-            grepl("NASE 14", cross) ~ "NASE 14\u00D75001\n(n = 1295)",
-            grepl("TME 14", cross) ~ "TME 14\u00D75001\n(n = 287)",
-            grepl("NASE 19", cross) ~ "NASE 19\u00D75001\n(n = 1336)"
+            grepl("NASE 14", cross) ~ "NASE 14\u00D7LCR\n(n = 1295)",
+            grepl("TME 14", cross) ~ "TME 14\u00D7LCR\n(n = 287)",
+            grepl("NASE 19", cross) ~ "NASE 19\u00D7LCR\n(n = 1336)"
         )
     )
 
@@ -570,8 +570,6 @@ rabbi <- tibble(CHROM = "chromosomeXII", zoom = T, y = 0.40, x = 8965822+3960260
 p1 <- BSA %>% 
     left_join(chrm_lengths, by = "CHROM") %>% 
     ggplot() +
-    # geom_line(aes(x = POS + xcumsumpad, y = CI_99), color = "#EB8F86", size = 1) +
-    # geom_line(aes(x = POS + xcumsumpad, y = -CI_99), color = "#EB8F86", size = 1) +
     geom_point(data = . %>% mutate(zoom = FALSE), aes(x = POS + xcumsumpad, y = deltaSNP), alpha = 0.01) +
     geom_line(aes(x = POS + xcumsumpad, y = CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = -CI_95), color = "#EB8F86", size = 1) +
@@ -613,7 +611,7 @@ p1 <- BSA %>%
     scale_x_continuous(name = "Genomic position", 
                        breaks = c(qtl$qtl_start, 404700943, 406131764, qtl$qtl_end), 
                        labels = c(qtl$qtl_start_lab, "8,674,896", "10,105,717", qtl$qtl_end_lab)) + 
-    scale_y_continuous(name = "deltaSNP", limits = c(-0.5, 0.5)) 
+    scale_y_continuous(name = "\U0394SNP", limits = c(-0.5, 0.5)) 
 
 p1
 assign("index", 0, environment(grid:::grobAutoName)) #resets the grob integers
@@ -624,10 +622,10 @@ gTable$grobs[[4]]$children[2]$axis$grobs[[1]]$x <- rep(unit(0, units = "npc"), 8
 # grid::grid.newpage()
 # grid::grid.draw(gTable)
 
-rough <- cowplot::plot_grid(dr_plots, gTable, ncol = 1,
-                   rel_heights = c(0.3, 0.7),
-                   labels = c("", "c"))
-
+# rough <- cowplot::plot_grid(dr_plots, gTable, ncol = 1,
+#                    rel_heights = c(0.3, 0.7),
+#                    labels = c("", "c"))
+# 
 
 #### Fine Mapping #####
 
@@ -827,6 +825,7 @@ m1_dist <- dataM1_M8 %>% filter(CMD != "NA", marker == "M1", !Call %in% c("No Ca
     #                ) +
     scale_colour_manual(aesthetics = c("fill", "color"), values = c("#5F98C6", "#CBCBCB", "#E94849")) +
     guides(fill = "none") +
+    labs(x = "", y = "Count") +
     cowplot::theme_cowplot() +
     cowplot::panel_border() 
 
