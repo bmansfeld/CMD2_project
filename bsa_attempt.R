@@ -597,7 +597,7 @@ p1 <- BSA %>%
                linetype = 5) +
     geom_point(data = rabbi, aes(x = x, y = y), shape = 25, size = 4, fill = "black") +
     geom_point(data = rabbi, aes(y = 0.41, x = 8965822+396026047), shape = 22, size = 3, fill = "black") +
-    geom_point(data = rabbi, aes(y = 0.42, x = 8965822+396026047), shape = 22, size = 3, fill = "black") +
+    geom_point(data = rabbi, aes(y = 0.43, x = 8965822+396026047), shape = 22, size = 3, fill = "black") +
     ggrepel::geom_text_repel(seed = 1, data = marker_pos, aes(x = POS, y = 0.3, label = marker),
                              #direction = "y",
                              force_pull = 0, 
@@ -776,38 +776,31 @@ n2 <- length(unique(super_allM$line))
 finemap <- super_allM %>% 
     filter(!is.na(CMD)) %>% 
     filter(!line %in% c("P1504", "P001443")) %>%
-    # mutate(line = fct_reorder(line, .fun = mean, as.numeric(as.factor(CMD)))) %>% 
-    # mutate(line = fct_relevel(line, as.character(rec_order))) %>%
-    ggplot(aes(x = pos_label, y = line)) +
+    ggplot(aes(x = as.numeric(pos_label), y = line)) +
     geom_tile(aes(fill = Call, color = Call), height = 0.8) +
     geom_tile(aes(x = 0.35, fill2 = as.factor(CMD)), width = 0.25) %>%
     rename_geom_aes(new_aes = c("fill" = "fill2")) +
-    # scale_colour_brewer(type = "div",
-    #                     palette = "Set2",
-    #                     aesthetics = "fill",
-    #                     guide = "legend",
-    #                     name = "Genotype call") +
-    # scale_colour_brewer(type = "div",
-    #                     palette = "Set2",
-    #                     aesthetics = "color",
-    #                     guide = "legend",
-    #                     name = "Genotype call") +
-    # scale_colour_manual(aesthetics = "fill", values = RColorBrewer::brewer.pal(3,"Set1")[c(2, 3, 1)]) +
-    # scale_colour_manual(aesthetics = "color", values = RColorBrewer::brewer.pal(3,"Set1")[c(2, 3, 1)]) +
     scale_colour_manual(aesthetics = c("fill", "color"), values = c("#5F98C6", "#CBCBCB", "#E94849")) +
     scale_colour_brewer(type = "div",
                         palette = "Set1",
                         aesthetics = "fill2",
                         guide = "legend",
                         name = "Resistance") +
-    geom_vline(xintercept = 0.480, size = 1) +
+    geom_vline(xintercept = 0.48, size = 1.5) +
     # geom_line(data = data.frame(x = c(0, n1) + 0.5, y = rep(2:n2, each = 2) - 0.5),
     #           aes(x = x, y = y, group = y)) +
     # geom_point(aes(x = 0.5, y = line, color = `CMD`), size = 4) +
-    #annotate(geom = "text", x = 5, y = 0.75, label = "*", size = 20) +
+    # annotate(geom = "text", x = 0.40, y = 0, label = "Phenotype", size = 10) +
+    scale_x_continuous(breaks=c(0.35, 1, 2, 3, 4, 5, 6, 7),labels=c("Phenotype",levels(super_allM$pos_label)),
+                       expand=c(0,0)) +
     labs(x = "Marker physical position (bp)", y = "Line") +
     cowplot::theme_cowplot() +
     cowplot::panel_border() 
+
+assign("index", 0, environment(grid:::grobAutoName)) #resets the grob integers
+finemap_g <- ggplot_gtable(ggplot_build(finemap))
+finemap_g$grobs[[7]]$children[2]$axis$grobs[[2]]$children$GRID.text.17$rot <- c(45, rep(0, 7))
+finemap_g$grobs[[7]]$children[2]$axis$grobs[[2]]$children$GRID.text.17$hjust <- c(1, rep(0.5, 7))
 
 m1_dist <- dataM1_M8 %>% filter(CMD != "NA", marker == "M1", !Call %in% c("No Call", "Undetermined")) %>%
     filter(!CMD %in% c("NTC")) %>% 
@@ -840,12 +833,12 @@ m1_dist <- dataM1_M8 %>% filter(CMD != "NA", marker == "M1", !Call %in% c("No Ca
 
 plots_l <- cowplot::align_plots(dr_hist + facet_grid(~ "All\nLines") + theme(legend.position = "none"),
                               gTable,
-                              finemap,
+                              finemap_g,
                               align = 'v', axis = 'l')
 
 plots_r <- cowplot::align_plots(dr_dot,
                                 gTable,
-                                finemap,
+                                finemap_g,
                                 align = 'v', axis = 'lr')
 
 
@@ -863,4 +856,5 @@ mid_plots <- cowplot::plot_grid(plots_l[[2]], m1_dist, rel_widths = c(0.85, 0.15
 cowplot::plot_grid(dr_plots, mid_plots, plots_r[[3]],
                    labels = c("", "", "e"),
                    ncol = 1,
-                   rel_heights = c(1,1.75,1))
+                   rel_heights = c(1,1.75,1.3))
+
