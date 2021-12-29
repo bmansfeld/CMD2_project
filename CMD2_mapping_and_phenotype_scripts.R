@@ -153,6 +153,7 @@ tricubeStat <- function(POS, Stat, windowSize = 2e6, ...)
                    POS)
 }
 
+# keep only F1 lines
 F1s <- tidy_geno_het_pheno %>% 
     filter(!line %in% c("NASE14", "5001-26", "5001-46", "TME14"))
 
@@ -204,7 +205,7 @@ dr_dot <- pheno_df %>% filter(grepl("NASE", cross) |
            alpha = "none"
     )
 
-# some check that bulking was successful 
+# some checks that bulking was successful 
 F1s %>% filter(line %in% samples) %>% 
     select(line, CMD, CMDs_Yr1, CMDs_Yr2, meanRating) %>%
     distinct() %>%  
@@ -231,12 +232,16 @@ F1s %>%
     cowplot::theme_cowplot() +
     cowplot::panel_border()
 
-# simulate confidence intervals
-CIs <- QTLseqr::simulateConfInt(bulkSize = bulkSize, popStruc = "F2", depth = seq(10, 100), intervals = c(0.05, 0.025, 0.005, 0.0005))   
+# simulate confidence intervals based on Takagi et al 2013
+CIs <-
+    QTLseqr::simulateConfInt(
+        bulkSize = bulkSize,
+        popStruc = "F2",
+        depth = seq(10, 100),
+        intervals = c(0.05, 0.025, 0.005, 0.0005)
+    )
 
-# prep for BSA
-
-
+# prep for BSA: calculate mean SNP index for each bulk, smooth SNPindex and depth
 BSA <- F1s %>% 
     filter(line %in% samples) %>% 
     mutate(DP = as.numeric(DP)) %>% 
@@ -261,7 +266,7 @@ BSA <- F1s %>%
     mutate(minDP = floor(min(c(smoothDP_R, smoothDP_S)))) %>% 
     left_join(CIs, by = c("minDP" = "depth"))
 
-# check snp-indeces for each bulk 
+# check SNP-indeces for each bulk 
 BSA %>% 
     ggplot() +
     geom_histogram(aes(x = SNPindex_R))
@@ -302,7 +307,7 @@ qtl <- BSA %>% filter(abs(smoothDeltaSNP) > abs(CI_95)) %>%
 marker_pos <- tibble(CHROM = "chromosomeXII",
                      assembly = "TME204-hap1",
                      marker = paste0("M", c(1, 2, 3, 5, 6, 7, 8)),
-                     POS = c(8674846 + 50,
+                     POS = c(8674846 + 50, # add 50nt to the start of the marker BLAST hit
                              8921611 + 50,
                              8965803 + 50,
                              #9311735 + 50, # MARKER 4 was bad
@@ -326,14 +331,17 @@ rabbi <- tibble(CHROM = "chromosomeXII", zoom = T, y = 0.40, x = 8965822 + chr12
 full_genome <- BSA %>% 
     left_join(chrm_lengths, by = "CHROM") %>% 
     ggplot() +
-    geom_point(data = . %>% mutate(zoom = FALSE), aes(x = POS + xcumsumpad, y = deltaSNP), alpha = 0.02) +
+    geom_point(data = . %>% mutate(zoom = FALSE), 
+               aes(x = POS + xcumsumpad, y = deltaSNP), 
+               alpha = 0.02) +
     geom_line(aes(x = POS + xcumsumpad, y = CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = -CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = smoothDeltaSNP)) +
     geom_vline(data = chrm_lengths,
                aes(xintercept = xcumsumpad),
                linetype = 2) +
-    geom_text(data = chrm_lengths %>% mutate(zoom = FALSE), aes(x = labelpos, y = -0.4, label = label)) +
+    geom_text(data = chrm_lengths %>% mutate(zoom = FALSE), 
+              aes(x = labelpos, y = -0.4, label = label)) +
     geom_rect(data = qtl,
               alpha = 0.2,
               fill = "#5F98C6",
@@ -359,7 +367,9 @@ qtl_zoom <- BSA %>%
     left_join(chrm_lengths, by = "CHROM") %>% 
     filter(between(POS + xcumsumpad, qtl$qtl_start - 3.5e6, qtl$qtl_end + 3.5e6)) %>% 
     ggplot() +
-    geom_point(data = . %>% mutate(zoom = TRUE), aes(x = POS + xcumsumpad, y = deltaSNP), alpha = 0.3) +
+    geom_point(data = . %>% mutate(zoom = TRUE), 
+               aes(x = POS + xcumsumpad, y = deltaSNP), 
+               alpha = 0.3) +
     geom_line(aes(x = POS + xcumsumpad, y = CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = -CI_95), color = "#EB8F86", size = 1) +
     geom_line(aes(x = POS + xcumsumpad, y = smoothDeltaSNP)) +
@@ -373,17 +383,15 @@ qtl_zoom <- BSA %>%
                aes(xintercept = qtl_start),
                linetype = 5) +
     geom_point(data = rabbi, aes(x = x, y = y), shape = 25, size = 5, fill = "black") +
-    # geom_point(data = rabbi, aes(y = 0.41, x = x), shape = 22, size = 3, fill = "black") +
-    # geom_point(data = rabbi, aes(y = 0.43, x = x), shape = 22, size = 3, fill = "black") +
-    ggrepel::geom_text_repel(seed = 1, data = marker_pos, aes(x = POS  + chr12_pad, y = 0.0, label = marker),
-                             #direction = "y",
+    ggrepel::geom_text_repel(
+                             aes(x = POS  + chr12_pad, y = 0.0, label = marker),
+                             seed = 1, data = marker_pos, 
                              force_pull = 0, 
                              force = 5, 
                              nudge_y = 0.1,
                              segment.curvature = -1e-20) +
     cowplot::theme_cowplot() +
     cowplot::panel_border() +
-    # theme(axis.text.x = element_blank()) +
     scale_x_continuous(name = "Genomic position", 
                        breaks = c(qtl$qtl_start, 404700943, 406131764, qtl$qtl_end), 
                        labels = c(qtl$qtl_start_lab, "8,674,896", "10,105,717", qtl$qtl_end_lab)) + 
@@ -659,9 +667,24 @@ super_allM <- bind_rows(super, controls, super_M3_5_7  %>%
                             distinct(line, marker, Call, .keep_all = TRUE)) %>% 
     ungroup() %>% 
     mutate(Call = fct_relevel(Call, "Allele 1", "Heterozygote", "Allele 2")) %>% 
-    mutate(line = fct_relevel(line, "P1561", "P1504", "P001430", "P000207", "P1862", "P000264", "P1832", "P000901", "P1606", "P1942", "P1581")) %>%
+    mutate(
+        line = fct_relevel(
+            line,
+            "P1561",
+            "P1504",
+            "P001430",
+            "P000207",
+            "P1862",
+            "P000264",
+            "P1832",
+            "P000901",
+            "P1606",
+            "P1942",
+            "P1581"
+        )
+    ) %>% 
     mutate(POS = case_when(
-        marker == "M1" ~ 8674846 + 50, 
+        marker == "M1" ~ 8674846 + 50, # add 50nt to the start of the marker BLAST hit
         marker == "M2" ~ 8921611 + 50, 
         marker == "M3" ~ 8965803 + 50, 
         marker == "M4" ~ 9311735 + 50, 
@@ -680,12 +703,8 @@ finemap <- super_allM %>%
     geom_tile(aes(fill = Call, color = Call), height = 0.8) +
     geom_tile(aes(x = 0.35, fill2 = as.factor(CMD)), width = 0.25) %>%
     rename_geom_aes(new_aes = c("fill" = "fill2")) +
-    scale_colour_manual(aesthetics = c("fill", "color"), values = c("#5F98C6", "#CBCBCB", "#E94849")) +
-    # scale_colour_brewer(type = "div",
-    #                     palette = "Set1",
-    #                     aesthetics = "fill2",
-    #                     guide = "legend",
-    #                     name = "Resistance") +
+    scale_colour_manual(aesthetics = c("fill", "color"), 
+                        values = c("#5F98C6", "#CBCBCB", "#E94849")) +
     scale_colour_manual(aesthetics = "fill2", 
                         guide = "legend",
                         name = "CMD phenotype",
@@ -713,7 +732,7 @@ am560_cmd <- read.delim(file = "chrm12_genes_am560.gff", header = F)
 marker_pos_am560 <- tibble(CHROM = "chromosome12", 
                            assembly = "AM560-2 v6.1", 
                            marker = paste0("M", c(1, 2, 3, 5, 6, 7, 8)),
-                           POS = c(7705631 + 50,
+                           POS = c(7705631 + 50, # add 50nt to the start of the marker BLAST hit
                                    7893491 + 50,
                                    7926114 + 50,
                                    #8035292 + 50, # MARKER 4 was bad
@@ -964,6 +983,8 @@ patchwork <-
                 ) +
     plot_annotation(tag_levels = list(letters[1:6]))
 
+
+# manually rotate the phenotype tick in the figures
 assign("index", 0, environment(grid:::grobAutoName)) #resets the grob integers
 gTable <- patchwork::patchworkGrob(patchwork)
 gTable$grobs[[7]]$children[2]$axis$grobs[[2]]$children$GRID.text.16$rot <- c(45, rep(0, 7))
