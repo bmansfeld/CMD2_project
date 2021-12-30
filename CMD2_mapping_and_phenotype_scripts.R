@@ -973,7 +973,8 @@ patchwork <-
     axis.ticks.x = element_blank(),
     plot.margin = unit(c(0.5, 0,-1, 0), "cm")
 )) +  # c
-    (roughmap + theme(legend.position = "none", 
+    (roughmap + theme(legend.position = "none",
+                      #axis.text.x = element_text(size = 10),
                       plot.margin = unit(c(-1, 0, 0, 0), "cm"))) + # D
     finemap + #E 
     (gene_map + theme(legend.position = "none")) + # F
@@ -998,7 +999,7 @@ gTable$grobs[[79]]$children[2]$axis$grobs[[2]]$children$GRID.text.177$hjust <- c
 
 grid.draw(gTable)
 
-ggsave("Figure2.pdf", gTable, width = 14, height = 12, device = cairo_pdf)
+ggsave("Figure2_12302021.pdf", gTable, width = 16, height = 12, device = cairo_pdf)
 
 #### Supp figures for mapping ####
 
